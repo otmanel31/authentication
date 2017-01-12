@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<title>Authentification</title>
+<meta name="author" content="(Pierre Gambarotto)"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/reveal.css"/>
+
+<link rel="stylesheet" href="http://cdn.jsdelivr.net/reveal.js/3.0.0/css/theme/moon.css" id="theme"/>
+
+<link rel="stylesheet" href="./local.css"/>
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'http://cdn.jsdelivr.net/reveal.js/3.0.0/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h1 class="title">Authentification</h1><h2 class="author">Pierre Gambarotto</h2><p class="date">Created: 2017-01-12 jeu. 04:09</p>
+</section>
+
+<section>
+<section id="slide-orgheadline2">
+<h2 id="orgheadline2">Les concepts abordés</h2>
+<ul>
+<li>Session</li>
+<li>Authentification</li>
+
+</ul>
+
+
+
+</section>
+<section id="slide-session-applicative">
+<h3 id="session-applicative"><a id="orgheadline1"></a>Session applicative</h3>
+<ul>
+<li><b>contexte multi-utilisateurs</b> N clients pour 1 serveur</li>
+<li><b>session</b> grouper toutes les interactions d'un client spécifique par
+rapport à mon serveur/application.</li>
+<li><b>session</b> gérer un état spécifique au client</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline6">
+<h2 id="orgheadline6">Session pour une application HTTP</h2>
+<ul>
+<li>grouper toutes les requêtes issues d'un même client HTTP.</li>
+<li>conserver au niveau serveur des informations sur un client</li>
+<li>retrouver les informations à chaque requête du client</li>
+
+</ul>
+
+
+</section>
+<section id="slide-orgheadline3">
+<h3 id="orgheadline3">Session et gestion d'état</h3>
+<ul>
+<li>un interlocuteur associé à un token</li>
+<li>token comme clef dans une solution de stockage</li>
+
+</ul>
+
+<pre class="example">
+Token =&gt; identifiant unique par interlocuteur
+                ID_XYZ identifie Alice
+                ID_USER2 identifie Bob
+
+Sessions =&gt; { ID_XYZ: 
+               { page_courante: '/panier',
+                 panier: { objet: 445, quantity: 2, name: 'Pikaaaa !'}
+               },
+              ID_USER2:
+               { page_courante: '/welcome'}
+            }
+</pre>
+
+</section>
+<section id="slide-orgheadline4">
+<h3 id="orgheadline4">Authentification/Autorisation</h3>
+<dl>
+<dt>Authentification</dt><dd>Savoir <b>qui</b> me contacte</dd>
+<dt>Autorisaton</dt><dd>permettre/interdire à un client/interlocuteur d'exécuter une action sur mon serveur</dd>
+
+</dl>
+
+</section>
+<section id="slide-orgheadline5">
+<h3 id="orgheadline5">Scénario d'authentification</h3>
+<ol>
+<li>l'utilisateur prouve son identité</li>
+<li>reçoit un token l'identifiant de manière unique</li>
+<li>utilise le token par la suite à la place</li>
+<li>le token sert de clef pour gérer un état dans le conteneur de session côté serveur</li>
+
+</ol>
+
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline10">
+<h2 id="orgheadline10">HTTP</h2>
+<ul>
+<li>HTTP ne gère pas de session nativement.</li>
+<li>un serveur HTTP voit : @IP client, requête</li>
+<li>il faut donc gérer au niveau applicatif</li>
+
+</ul>
+
+</section>
+<section id="slide-orgheadline7">
+<h3 id="orgheadline7">Principe d'implémentation</h3>
+<p>
+Dès que l'on décide de gérer une session :
+</p>
+
+<ol>
+<li>le serveur crée un <b>identifiant</b></li>
+<li>le serveur donne l'identifiant au client dans une réponse</li>
+<li>le client rappelle l'identifiant dans les requêtes suivants</li>
+<li>le serveur gère l'état propre au client</li>
+<li>Fin session: le serveur détruit l'état (optionnel …)</li>
+
+</ol>
+
+<p>
+<b>identifiant</b> index de l'état conservé par le serveur
+</p>
+
+<p>
+<b>À gérer entièrement à la main !</b>
+</p>
+
+</section>
+<section id="slide-orgheadline8">
+<h3 id="orgheadline8">Conteneur des sessions</h3>
+<p>
+On associe chaque identifiant avec un espace de stockage.
+</p>
+
+<ul>
+<li>mémoire vive</li>
+<li>dans la réponse, comme l'identifiant</li>
+<li>couche de persistence (fichier, BD &#x2026;)</li>
+
+</ul>
+
+</section>
+<section id="slide-orgheadline9">
+<h3 id="orgheadline9">Sécurité</h3>
+<ul>
+<li><b>session hijacking</b> trouver l'identifiant de session d'un autre
+client http</li>
+<li>HTTPS assure le chiffrement des entêtes, donc à ne pas réserver aux
+quelques pages sensibles.</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline11">
+<h2 id="orgheadline11">Génération de l'identifiant</h2>
+<ul>
+<li>au niveau du serveur</li>
+<li>généreration aléatoire et non prévisible par un tiers</li>
+<li>algorithme de base : <code>hash(random())</code></li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline13">
+<h2 id="orgheadline13">Communication de l'identifiant</h2>
+<p>
+<b>Du serveur au client</b>
+</p>
+<ul>
+<li>header réponse</li>
+<li>corps réponse</li>
+
+</ul>
+
+<p>
+<b>Du client au serveur</b>
+</p>
+
+<ul>
+<li>header requête</li>
+<li>dans le corps de la requête</li>
+<li>path (1ère ligne de la requête), comme paramètre de requête</li>
+
+</ul>
+
+</section>
+<section id="slide-orgheadline12">
+<h3 id="orgheadline12">Côté client</h3>
+<ul>
+<li>client bas niveau : curl/wget, code : on s'adapte</li>
+<li>navigateur : interactions avec le serveur limités
+<ul>
+<li>GET</li>
+<li>POST</li>
+<li>si code JS embarqué, c'est le cas précédent</li>
+
+</ul></li>
+
+</ul>
+
+<p>
+Les cookies fournissent un moyen standardisé pour un navigateur de rappeler un
+identifiant au serveur
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline16">
+<h2 id="orgheadline16">Cookies</h2>
+<ul>
+<li>cookie : suite d'information envoyée par un serveur HTTP à un client,
+et stocké sur le client</li>
+
+</ul>
+
+
+
+<div class="figure">
+<p><img src="./i/cookies.jpg" alt="cookies.jpg" />
+</p>
+</div>
+
+<p>
+Le client rappelle <b>automatiquement</b> la valeur à chaque requête au serveur initial
+</p>
+
+</section>
+<section>
+
+<ul>
+<li>positionnement par le serveur avec l'en-tête</li>
+
+</ul>
+
+<pre class="example">
+Set-Cookie: name=value;attr=val;attr=val…
+</pre>
+
+<ul>
+<li>rappel de la valeur par le client avec l'en-tête</li>
+
+</ul>
+
+<pre class="example">
+Cookie: name=value
+</pre>
+
+<ul>
+<li>attributs à la mise en place: date d'expiration, chemin, domaine,
+chiffré ou non</li>
+
+</ul>
+
+<pre class="example">
+Set-Cookie: nom=nouvelle_valeur; expires=date; path=/; domain=.exemple.org
+</pre>
+
+</section>
+<section>
+
+<ul>
+<li>persistant : date d'expiration donnée et dans le futur, sinon cookie
+de session (persiste jusqu'à l'arrêt du navigateur)</li>
+<li>supprimer un cookie : positionner une date d'expiration dans le passé
+sur un cookie existant</li>
+<li>les attributs <code>Path</code> et <code>Domain</code> déterminent le chemin et les sites
+pour lesquels le cookie sera renvoyé.</li>
+
+</ul>
+
+<p>
+Les dates d'expiration sont données sous le format
+<code>Wdy, DD-Mon-YYYY HH:MM:SS GMT</code>, par exemple <code>Mon, 15-Mar-2042 22:42:12</code>
+</p>
+
+<ul>
+<li>référence complète: <a href="http://tools.ietf.org/html/rfc2109">RFC2109</a> et <a href="http://tools.ietf.org/html/rfc2965">RFC2965</a></li>
+<li><a href="http://en.wikipedia.org/wiki/HTTP_cookie">cookie</a></li>
+
+</ul>
+
+</section>
+<section id="slide-orgheadline14">
+<h3 id="orgheadline14">Cookie, le bilan</h3>
+<ul>
+<li>permet de gérer l'état d'un client</li>
+<li>en stockant chez le client !</li>
+<li>simple à utiliser</li>
+<li><b>mais</b> stockage limité</li>
+<li><b>mais</b> mauvaise réputation
+<ul>
+<li>utilisation pour tracer le parcours des utilisateurs</li>
+<li>géré à l'insue de l'utilisateur</li>
+
+</ul></li>
+
+</ul>
+
+<p>
+<b>Bonnes pratiques</b>
+</p>
+
+<ul>
+<li>pas d'info dans le cookie, juste un identifiant</li>
+<li>chiffrez !</li>
+
+</ul>
+
+</section>
+<section id="slide-orgheadline15">
+<h3 id="orgheadline15">Cookies avec express.js</h3>
+<p>
+<b>Pour <a href="http://expressjs.com/en/4x/api.html#res.cookie">positionner un cookie</a> dans la réponse</b>
+</p>
+
+<div class="org-src-container">
+
+<pre  class="src src-javascript">res.cookie<span style="color: #4f97d7;">(</span>name, value, <span style="color: #bc6ec5;">[</span>options<span style="color: #bc6ec5;">]</span><span style="color: #4f97d7;">)</span>; 
+<span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">options : { domain: '.example.com', path: '/admin', secure: true } </span>
+<span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">options : { expires: new Date(Date.now() + 3600000), httpOnly: true} </span>
+<span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">expires : in milliseconds</span>
+</pre>
+</div>
+
+</section>
+<section>
+<p>
+<b>Pour lire un cookie provenant d'un client</b>
+</p>
+
+<ul>
+<li>lire le header cookie, et l'analyser (parsing &#x2026;)</li>
+
+</ul>
+
+<div class="org-src-container">
+
+<pre  class="src src-javascript"><span style="color: #4f97d7; font-weight: bold;">var</span> <span style="color: #7590db;">raw</span>\_cookie = req.headers<span style="color: #4f97d7;">[</span><span style="color: #2d9574;">'cookie'</span><span style="color: #4f97d7;">]</span>; 
+<span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">savant usage de string#split() ...</span>
+</pre>
+</div>
+
+<ul>
+<li>express: analyse automatique des cookies par l'utilisation d'un
+middleware, par exemple <a href="https://github.com/expressjs/cookie-parser">cookie-parser</a></li>
+
+</ul>
+
+
+<div class="org-src-container">
+
+<pre  class="src src-javascript"><span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">Cookie: name=tj </span>
+req.cookies.name <span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">=&gt; "tj"</span>
+</pre>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline19">
+<h2 id="orgheadline19">Alternative au cookies</h2>
+<ul>
+<li>cookies: mauvaise réputation</li>
+<li>faire pareil, mais manuellement !</li>
+
+</ul>
+
+
+</section>
+<section id="slide-orgheadline17">
+<h3 id="orgheadline17">Requêtes générées par des vues HTML</h3>
+<ul>
+<li><code>GET /blablah?sessionID=XXXXXXXXXXXXX</code></li>
+<li><code>POST</code> : paramètre de formulaire caché</li>
+
+</ul>
+
+<div class="org-src-container">
+
+<pre  class="src src-html">&lt;<span style="color: #bc6ec5; font-weight: bold;">form</span> <span style="color: #7590db;">action</span>=<span style="color: #2d9574;">"/blahblah"</span> <span style="color: #7590db;">method</span>=<span style="color: #2d9574;">"post"</span>&gt;
+  &lt;<span style="color: #bc6ec5; font-weight: bold;">input</span> <span style="color: #7590db;">type</span>=<span style="color: #2d9574;">"hidden"</span> <span style="color: #7590db;">name</span>=<span style="color: #2d9574;">"sessionID"</span> <span style="color: #7590db;">value</span>=<span style="color: #2d9574;">"XXXXXXXXXXXXXX"</span>&gt;
+&lt;/<span style="color: #bc6ec5; font-weight: bold;">form</span>&gt;
+</pre>
+</div>
+
+<p>
+Toutes les vues doivent être générées dynamiquement !
+</p>
+
+</section>
+<section id="slide-orgheadline18">
+<h3 id="orgheadline18">Requêtes générées par du code js</h3>
+<p>
+Le code JS embarqué dans la page HTML va modifier les requêtes émises par le
+navigateur pour inclure l'identifiant de session.
+</p>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline21">
+<h2 id="orgheadline21">Session</h2>
+<ul>
+<li><b>début de session</b>, suite à une requête spécifique
+<ol>
+<li>générer un identifiant</li>
+<li>initialiser le conteneur de session associé</li>
+<li>communiquer l'identifant dans la réponse</li>
+
+</ol></li>
+<li>lors des <b>requêtes suivantes</b>:
+<ol>
+<li>extraire l'identifiant de la requête</li>
+<li>récupérer l'état associé dans le conteneur de session</li>
+<li>l'action serveur va faire évoluer l'état</li>
+
+</ol></li>
+<li><b>fin de session</b>
+<ol>
+<li>nettoyage de l'état</li>
+<li>nettoyage de l'identifiant</li>
+
+</ol></li>
+
+</ul>
+
+</section>
+<section id="slide-orgheadline20">
+<h3 id="orgheadline20">Techniquement …</h3>
+<p>
+Une solution de gestion de session http comprend
+</p>
+
+<ol>
+<li>génération d'identifiant côté serveur</li>
+<li>communication de l'identifiant au client</li>
+<li>solution pour extraire l'identifiant des requêtes clients</li>
+<li>conteneur de session</li>
+
+</ol>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline23">
+<h2 id="orgheadline23">Gérer une session dans express</h2>
+<p>
+Middleware <a href="https://github.com/expressjs/session"><code>express-session</code></a>
+</p>
+
+<ul>
+<li>communication de l'identifiant de session: par cookie</li>
+<li>container de session : par défaut en mémoire sur le serveur</li>
+<li>container persistent avec d'autres middlewares (redis, mongodb, bd sql)</li>
+
+</ul>
+
+<p>
+Middleware<a href="https://github.com/expressjs/cookie-session"><code>cookie-session</code></a>
+</p>
+
+<ul>
+<li>idem, mais stockage de la session dans un cookie</li>
+
+</ul>
+
+
+</section>
+<section id="slide-orgheadline22">
+<h3 id="orgheadline22">Mise en application</h3>
+<p>
+Une fois un middleware gérant la session activé :
+</p>
+
+<ul>
+<li><code>req.session</code> : objet javascript contenant la session de
+l'utilisateur courant.</li>
+
+</ul>
+
+<div class="org-src-container">
+
+<pre  class="src src-javascript"><span style="color: #2aa1ae; background-color: #292e34;">// </span><span style="color: #2aa1ae; background-color: #292e34;">stocker une valeur dans la session </span>
+req.session<span style="color: #4f97d7;">[</span>key<span style="color: #4f97d7;">]</span> = val 
+<span style="color: #2aa1ae; background-color: #292e34;">//</span><span style="color: #2aa1ae; background-color: #292e34;">r&#233;cup&#233;rer une valeur pr&#233;c&#233;demment stock&#233;e </span>
+res.session<span style="color: #4f97d7;">[</span>key<span style="color: #4f97d7;">]</span>
+
+req.session.name = req.query.name
+req.session<span style="color: #4f97d7;">[</span><span style="color: #2d9574;">'# of visits'</span><span style="color: #4f97d7;">]</span> = <span style="color: #a45bad;">4</span>
+</pre>
+</div>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline24">
+<h2 id="orgheadline24">Authentification</h2>
+<p>
+Le client fournit des informations permettant au serveur de valider son identité
+</p>
+
+<p>
+<b>Sans Session</b>
+</p>
+
+<ul>
+<li>Informations soumises à chaque requête</li>
+<li>le serveur vérifie l'identité à chaque requête</li>
+
+</ul>
+
+</section>
+<section>
+
+<p>
+<b>Avec session</b>
+</p>
+
+<ul>
+<li>scénario d'échange identité &lt;-&gt; token</li>
+<li>identité fournie une fois, vérifié une fois</li>
+<li>les fois suivantes, le token à la place</li>
+<li>le serveur vérifie juste que le token existe</li>
+<li>le token sert de clef dans le conteneur de session</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-orgheadline25">
+<h2 id="orgheadline25">Liens</h2>
+<p>
+<b>Authentification fournies par HTTP</b>
+</p>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/Basic_access_authentication">Basic</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Digest_access_authentication">Digest</a></li>
+
+</ul>
+
+<p>
+<b>Délégation d'authentification</b>
+</p>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/OAuth">oauth</a></li>
+
+</ul>
+
+<p>
+<b>Gestion de token</b>
+</p>
+<ul>
+<li><a href="https://jwt.io/">jwt</a></li>
+
+</ul>
+
+<p>
+<b>étude du cas de gitlab</b> 
+</p>
+<ul>
+<li><a href="https://gitlab.enseeiht.fr/profile/personal_access_tokens">accès par token</a></li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/head.min.js"></script>
+<script src="http://cdn.jsdelivr.net/reveal.js/3.0.0/js/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: false,
+center: false,
+slideNumber: 'c',
+rollingLinks: false,
+keyboard: true,
+overview: true,
+margin: 0.01,
+
+theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
+transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+transitionSpeed: 'default',
+multiplex: {
+    secret: '', // null if client
+    id: '', // id, obtained from socket.io server
+    url: '' // Location of socket.io server
+},
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/lib/js/classList.js', condition: function() { return !document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: 'http://cdn.jsdelivr.net/reveal.js/3.0.0/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+});
+</script>
+</body>
+</html>

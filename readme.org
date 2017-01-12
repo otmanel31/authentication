@@ -21,7 +21,7 @@
 # tangle a block : C-u C-c C-v C-t (C-ucvt)
 
  
-* Les conception abordés
+* Les concepts abordés
 
 - Session 
 - Authentification
@@ -37,11 +37,12 @@
 - *session* grouper toutes les interactions d'un client spécifique par
   rapport à mon serveur/application.
 - *session* gérer un état spécifique au client 
-- *application HTTP*  
-  - grouper toutes les requêtes issues d'un même
-    client HTTP.
-  - conserver au niveau serveur des informations sur un client
-  - retrouver les informations à chaque requête du client
+
+* Session pour une application HTTP
+
+- grouper toutes les requêtes issues d'un même client HTTP.
+- conserver au niveau serveur des informations sur un client
+- retrouver les informations à chaque requête du client
 
 
 ** Session et gestion d'état
@@ -96,7 +97,7 @@ Dès que l'on décide de gérer une session :
 
 *À gérer entièrement à la main !*
 
-** Container des sessions
+** Conteneur des sessions
 
 On associe chaque identifiant avec un espace de stockage.
 
@@ -153,11 +154,19 @@ Le client rappelle *automatiquement* la valeur à chaque requête au serveur ini
 #+reveal: split
 
 -  positionnement par le serveur avec l'en-tête
-   =Set-Cookie: name=value;attr=val;attr=val…=
--  rappel de la valeur par le client avec l'en-tête =Cookie: name=value=
+
+#+BEGIN_EXAMPLE
+Set-Cookie: name=value;attr=val;attr=val…
+#+END_EXAMPLE
+
+-  rappel de la valeur par le client avec l'en-tête 
+
+#+BEGIN_EXAMPLE
+Cookie: name=value
+#+END_EXAMPLE 
+
 -  attributs à la mise en place: date d'expiration, chemin, domaine,
    chiffré ou non
-
 
 #+BEGIN_EXAMPLE
 Set-Cookie: nom=nouvelle_valeur; expires=date; path=/; domain=.exemple.org
@@ -178,6 +187,20 @@ Les dates d'expiration sont données sous le format
 -  référence complète: [[http://tools.ietf.org/html/rfc2109][RFC2109]] et [[http://tools.ietf.org/html/rfc2965][RFC2965]]
 -  [[http://en.wikipedia.org/wiki/HTTP_cookie][cookie]]
 
+** Cookie, le bilan
+
+- permet de gérer l'état d'un client
+- en stockant chez le client !
+- simple à utiliser
+- *mais* stockage limité
+- *mais* mauvaise réputation
+  - utilisation pour tracer le parcours des utilisateurs
+  - géré à l'insue de l'utilisateur
+
+*Bonnes pratiques*
+
+  - pas d'info dans le cookie, juste un identifiant
+  - chiffrez !
 
 ** Cookies avec express.js
 
@@ -235,15 +258,15 @@ navigateur pour inclure l'identifiant de session.
 
 * Session
 
-- début de session, suite à une requête spécifique
+- *début de session*, suite à une requête spécifique
   1. générer un identifiant
   2. initialiser le conteneur de session associé
   3. communiquer l'identifant dans la réponse
-- lors des requêtes suivantes:
+- lors des *requêtes suivantes*:
   1. extraire l'identifiant de la requête
   2. récupérer l'état associé dans le conteneur de session
   3. l'action serveur va faire évoluer l'état
-- fin de session
+- *fin de session*
   1. nettoyage de l'état
   2. nettoyage de l'identifiant
 
@@ -251,7 +274,7 @@ navigateur pour inclure l'identifiant de session.
 
 Une solution de gestion de session http comprend
 
-1. génération d'idententifiant côté serveur
+1. génération d'identifiant côté serveur
 2. communication de l'identifiant au client
 3. solution pour extraire l'identifiant des requêtes clients
 4. conteneur de session
