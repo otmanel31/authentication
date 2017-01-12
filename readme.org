@@ -1,0 +1,342 @@
+#+Title: Authentification
+#+Author: Pierre Gambarotto
+#+Email: pierre.gambarotto@enseeiht.fr
+#+OPTIONS: num:nil reveal_title_slide:auto toc:nil
+#+OPTIONS: reveal_center:nil
+#+REVEAL_THEME: moon
+#+REVEAL_EXTRA_CSS: ./local.css
+#+REVEAL_MARGIN: 0.01
+#+REVEAL_ROOT: http://cdn.jsdelivr.net/reveal.js/3.0.0/
+
+# C-c C-e R B|R to export as a reveal js presentation
+#+LATEX_CLASS: article
+#+LaTeX_CLASS_OPTIONS: [a4paper]
+#+LaTeX_CLASS_OPTIONS: [12pt]
+#+LaTeX_CLASS_OPTIONS: [listings, listings-sv]
+#+LANGUAGE: fr
+#+LATEX_HEADER: \usepackage[francais]{babel}
+
+# C-c C-e l l/p/o to export as latex/pdf document
+
+# tangle a block : C-u C-c C-v C-t (C-ucvt)
+
+ 
+* Les conception abordés
+
+- Session 
+- Authentification
+
+
+
+** Session applicative
+   :PROPERTIES:
+   :CUSTOM_ID: session-applicative
+   :END:
+
+- *contexte multi-utilisateurs* N clients pour 1 serveur
+- *session* grouper toutes les interactions d'un client spécifique par
+  rapport à mon serveur/application.
+- *session* gérer un état spécifique au client 
+- *application HTTP*  
+  - grouper toutes les requêtes issues d'un même
+    client HTTP.
+  - conserver au niveau serveur des informations sur un client
+  - retrouver les informations à chaque requête du client
+
+
+** Session et gestion d'état
+
+- un interlocuteur associé à un token
+- token comme clef dans une solution de stockage 
+
+#+BEGIN_EXAMPLE
+Token => identifiant unique par interlocuteur
+                ID_XYZ identifie Alice
+                ID_USER2 identifie Bob
+
+Sessions => { ID_XYZ: 
+               { page_courante: '/panier',
+                 panier: { objet: 445, quantity: 2, name: 'Pikaaaa !'}
+               },
+              ID_USER2:
+               { page_courante: '/welcome'}
+            }
+#+END_EXAMPLE
+
+** Authentification/Autorisation
+
+- Authentification :: Savoir *qui* me contacte
+- Autorisaton :: permettre/interdire à un client/interlocuteur d'exécuter une action sur mon serveur
+
+** Scénario d'authentification
+
+1. l'utilisateur prouve son identité
+2. reçoit un token l'identifiant de manière unique
+3. utilise le token par la suite à la place
+4. le token sert de clef pour gérer un état dans le conteneur de session côté serveur
+
+
+* HTTP
+
+-  HTTP ne gère pas de session nativement.
+-  un serveur HTTP voit : @IP client, requête
+-  il faut donc gérer au niveau applicatif
+
+** Principe d'implémentation
+
+Dès que l'on décide de gérer une session :
+
+1. le serveur crée un *identifiant*
+2. le serveur donne l'identifiant au client dans une réponse
+3. le client rappelle l'identifiant dans les requêtes suivants
+4. le serveur gère l'état propre au client
+5. Fin session: le serveur détruit l'état (optionnel …)
+
+*identifiant* index de l'état conservé par le serveur
+
+*À gérer entièrement à la main !*
+
+** Container des sessions
+
+On associe chaque identifiant avec un espace de stockage.
+
+- mémoire vive
+- dans la réponse, comme l'identifiant
+- couche de persistence (fichier, BD ...)
+
+** Sécurité
+
+- *session hijacking* trouver l'identifiant de session d'un autre
+  client http
+-  HTTPS assure le chiffrement des entêtes, donc à ne pas réserver aux
+   quelques pages sensibles.
+
+* Génération de l'identifiant
+
+- au niveau du serveur
+- généreration aléatoire et non prévisible par un tiers
+- algorithme de base : =hash(random())=
+
+* Communication de l'identifiant
+
+*Du serveur au client*
+-  header réponse
+-  corps réponse
+
+*Du client au serveur*
+
+-  header requête
+-  dans le corps de la requête
+-  path (1ère ligne de la requête), comme paramètre de requête
+
+** Côté client
+
+- client bas niveau : curl/wget, code : on s'adapte
+- navigateur : interactions avec le serveur limités
+  - GET
+  - POST
+  - si code JS embarqué, c'est le cas précédent
+
+Les cookies fournissent un moyen standardisé pour un navigateur de rappeler un
+identifiant au serveur
+
+* Cookies
+
+-  cookie : suite d'information envoyée par un serveur HTTP à un client,
+   et stocké sur le client
+
+
+[[./i/cookies.jpg]]
+
+Le client rappelle *automatiquement* la valeur à chaque requête au serveur initial
+
+#+reveal: split
+
+-  positionnement par le serveur avec l'en-tête
+   =Set-Cookie: name=value;attr=val;attr=val…=
+-  rappel de la valeur par le client avec l'en-tête =Cookie: name=value=
+-  attributs à la mise en place: date d'expiration, chemin, domaine,
+   chiffré ou non
+
+
+#+BEGIN_EXAMPLE
+Set-Cookie: nom=nouvelle_valeur; expires=date; path=/; domain=.exemple.org
+#+END_EXAMPLE
+
+#+reveal: split
+
+-  persistant : date d'expiration donnée et dans le futur, sinon cookie
+   de session (persiste jusqu'à l'arrêt du navigateur)
+-  supprimer un cookie : positionner une date d'expiration dans le passé
+   sur un cookie existant
+-  les attributs =Path= et =Domain= déterminent le chemin et les sites
+   pour lesquels le cookie sera renvoyé.
+
+Les dates d'expiration sont données sous le format
+=Wdy, DD-Mon-YYYY HH:MM:SS GMT=, par exemple =Mon, 15-Mar-2042 22:42:12=
+
+-  référence complète: [[http://tools.ietf.org/html/rfc2109][RFC2109]] et [[http://tools.ietf.org/html/rfc2965][RFC2965]]
+-  [[http://en.wikipedia.org/wiki/HTTP_cookie][cookie]]
+
+
+** Cookies avec express.js
+
+*Pour [[http://expressjs.com/en/4x/api.html#res.cookie][positionner un cookie]] dans la réponse*
+
+#+BEGIN_SRC javascript
+res.cookie(name, value, [options]); 
+// options : { domain: '.example.com', path: '/admin', secure: true } 
+// options : { expires: new Date(Date.now() + 3600000), httpOnly: true} 
+// expires : in milliseconds
+#+END_SRC
+
+#+REVEAL: split
+*Pour lire un cookie provenant d'un client*
+
+-  lire le header cookie, et l'analyser (parsing ...)
+
+#+BEGIN_SRC javascript
+var raw\_cookie = req.headers['cookie']; 
+// savant usage de string#split() ...
+#+END_SRC
+
+-  express: analyse automatique des cookies par l'utilisation d'un
+   middleware, par exemple [[https://github.com/expressjs/cookie-parser][cookie-parser]]
+
+
+#+BEGIN_SRC javascript
+// Cookie: name=tj 
+req.cookies.name // => "tj"
+#+END_SRC
+
+* Alternative au cookies
+
+- cookies: mauvaise réputation
+- faire pareil, mais manuellement !
+
+
+** Requêtes générées par des vues HTML
+
+- ~GET /blablah?sessionID=XXXXXXXXXXXXX~
+- ~POST~ : paramètre de formulaire caché 
+
+#+BEGIN_SRC html
+  <form action="/blahblah" method="post">
+    <input type="hidden" name="sessionID" value="XXXXXXXXXXXXXX">
+  </form>
+#+END_SRC
+
+Toutes les vues doivent être générées dynamiquement !
+
+** Requêtes générées par du code js
+
+Le code JS embarqué dans la page HTML va modifier les requêtes émises par le
+navigateur pour inclure l'identifiant de session.
+
+* Session
+
+- début de session, suite à une requête spécifique
+  1. générer un identifiant
+  2. initialiser le conteneur de session associé
+  3. communiquer l'identifant dans la réponse
+- lors des requêtes suivantes:
+  1. extraire l'identifiant de la requête
+  2. récupérer l'état associé dans le conteneur de session
+  3. l'action serveur va faire évoluer l'état
+- fin de session
+  1. nettoyage de l'état
+  2. nettoyage de l'identifiant
+
+** Techniquement …
+
+Une solution de gestion de session http comprend
+
+1. génération d'idententifiant côté serveur
+2. communication de l'identifiant au client
+3. solution pour extraire l'identifiant des requêtes clients
+4. conteneur de session
+
+* Gérer une session dans express
+
+Middleware [[https://github.com/expressjs/session][=express-session=]]
+
+-  communication de l'identifiant de session: par cookie
+-  container de session : par défaut en mémoire sur le serveur
+-  container persistent avec d'autres middlewares (redis, mongodb, bd sql)
+
+Middleware[[https://github.com/expressjs/cookie-session][=cookie-session=]]
+
+-  idem, mais stockage de la session dans un cookie
+
+
+** Mise en application
+
+Une fois un middleware gérant la session activé :
+
+-  =req.session= : objet javascript contenant la session de
+   l'utilisateur courant.
+
+#+BEGIN_SRC javascript
+// stocker une valeur dans la session 
+req.session[key] = val 
+//récupérer une valeur précédemment stockée 
+res.session[key]
+
+req.session.name = req.query.name
+req.session['# of visits'] = 4
+#+END_SRC
+
+* Authentification
+
+Le client fournit des informations permettant au serveur de valider son identité
+
+*Sans Session*
+
+- Informations soumises à chaque requête
+- le serveur vérifie l'identité à chaque requête
+
+#+reveal: split
+
+*Avec session*
+
+- scénario d'échange identité <-> token
+- identité fournie une fois, vérifié une fois
+- les fois suivantes, le token à la place
+- le serveur vérifie juste que le token existe
+- le token sert de clef dans le conteneur de session
+
+* Liens
+
+*Authentification fournies par HTTP*
+- [[https://en.wikipedia.org/wiki/Basic_access_authentication][Basic]]
+- [[https://en.wikipedia.org/wiki/Digest_access_authentication][Digest]]
+
+*Délégation d'authentification*
+- [[https://en.wikipedia.org/wiki/OAuth][oauth]]
+
+*Gestion de token*
+- [[https://jwt.io/][jwt]]
+
+*étude du cas de gitlab* 
+-  [[https://gitlab.enseeiht.fr/profile/personal_access_tokens][accès par token]]
+
+
+* COMMENT plan
+
+cours actuel, à relire pour les transitions
+
+session : code basique
+
+rajouter après les principes la succession classique des écrans dans un scénario
+d'authentification
+
+protéger une route : faire passer par le middleware d'authentification
+
+fournir modèle sequelize et vues pour gestion d'utilisateur nom, prénom, mail,
+mot de passe, en pur html et API json, sans validation
+
+TP : faire tout à la main le matin
+
+PM : utiliser passport
+
+conclusion sur les différents services existants, démonstration avec gitlab ?
